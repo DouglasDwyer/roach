@@ -469,8 +469,8 @@ impl<'a, D> Transaction<'a, Mut, D> {
     }
 }
 
-unsafe impl<'a, M: Mutability, D> Send for Transaction<'a, M, D> { }
-unsafe impl<'a, M: Mutability, D> Sync for Transaction<'a, M, D> { }
+unsafe impl<'a, M: Mutability, D> Send for Transaction<'a, M, D> {}
+unsafe impl<'a, M: Mutability, D> Sync for Transaction<'a, M, D> {}
 
 impl<'a, M: Mutability, D> Drop for Transaction<'a, M, D> {
     fn drop(&mut self) {
