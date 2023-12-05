@@ -100,20 +100,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26072860ba924cbfa98ea39c8c19b4dd6a4a25423dbdf219c1eca91aa0cf6964"
 
 [[package]]
-name = "placeholder"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "redb",
- "rmp-serde",
- "serde",
- "thiserror",
- "wasm_sync",
- "zstd",
- "zstd-safe",
-]
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -160,6 +146,20 @@ dependencies = [
  "byteorder",
  "rmp",
  "serde",
+]
+
+[[package]]
+name = "roach"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "redb",
+ "rmp-serde",
+ "serde",
+ "thiserror",
+ "wasm_sync",
+ "zstd",
+ "zstd-safe",
 ]
 
 [[package]]

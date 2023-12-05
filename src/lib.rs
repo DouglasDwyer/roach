@@ -24,8 +24,8 @@ pub struct Archive<D> {
 }
 
 impl<D> Archive<D> {
-    pub fn new(backend: impl StorageBackend) -> Result<Self, DbError> {
-        let database = Builder::new().create_with_backend(backend).map_err(DbError::from_io)?;
+    pub fn new(backend: impl StorageBackend) -> Result<Self, ArchiveError> {
+        let database = Builder::new().create_with_backend(backend).map_err(ArchiveError::from_io)?;
 
         Ok(Self {
             database,
@@ -33,13 +33,13 @@ impl<D> Archive<D> {
         })
     }
 
-    pub fn read(&self) -> Result<Transaction<'_, Const, D>, DbError> {
-        let txn = self.database.begin_read().map_err(DbError::from_io)?;
+    pub fn read(&self) -> Result<Transaction<'_, Const, D>, ArchiveError> {
+        let txn = self.database.begin_read().map_err(ArchiveError::from_io)?;
         Ok(Transaction::new(txn))
     }
 
-    pub fn write(&self) -> Result<Transaction<'_, Mut, D>, DbError> {
-        let txn = self.database.begin_write().map_err(DbError::from_io)?;
+    pub fn write(&self) -> Result<Transaction<'_, Mut, D>, ArchiveError> {
+        let txn = self.database.begin_write().map_err(ArchiveError::from_io)?;
         Ok(Transaction::new(txn))
     }
 }
@@ -61,12 +61,12 @@ impl<'a, M: Mutability, D> Transaction<'a, M, D> {
         }
     }
 
-    pub fn get<K: 'static>(&self, key: &K) -> Result<Option<<<D as DataTable<K>>::Value as DataLoad<'_>>::OutputType>, DbError> where D: DataTable<K> {
+    pub fn get<K: 'static + ?Sized>(&self, key: &K) -> Result<Option<<<D as ArchiveType<K>>::Value as DataLoad<'_>>::OutputType>, ArchiveError> where D: ArchiveType<K> {
         unsafe {
             if let Some(table) = self.get_table::<K>()? {
-                let raw_value = table.get(<<<D as DataTable<K>>::Key as BinaryConverter<'static>>::ByteConverter>::apply(transmute(key))?.into_db_value()?.as_ref()).map_err(DbError::from_io)?;
+                let raw_value = table.get(<<<D as ArchiveType<K>>::Key as BinaryConverter<'static>>::ByteConverter>::apply(transmute(key))?.into_db_value()?.as_ref()).map_err(ArchiveError::from_io)?;
                 if let Some(value) = raw_value {
-                    Ok(Some(transmute(<<<D as DataTable<K>>::Value as DataLoad<'a>>::OutputConverter>::apply(transmute(value))?)))
+                    Ok(Some(transmute(<<<D as ArchiveType<K>>::Value as DataLoad<'a>>::OutputConverter>::apply(transmute(value))?)))
                 }
                 else {
                     Ok(None)
@@ -78,9 +78,9 @@ impl<'a, M: Mutability, D> Transaction<'a, M, D> {
         }
     }
 
-    pub fn keys<K: 'static>(&self) -> impl '_ + Iterator<Item = Result<<<D as DataTable<K>>::Key as BinaryConverter<'_>>::ValueOutput, DbError>> where D: DataTable<K> {
+    pub fn keys<K: 'static + ?Sized>(&self) -> impl '_ + Iterator<Item = Result<<<D as ArchiveType<K>>::Key as BinaryConverter<'_>>::ValueOutput, ArchiveError>> where D: ArchiveType<K> {
         unsafe {
-            let iter_table = self.get_table::<K>().and_then(|table| if let Some(tbl) = table { Ok(Some(tbl.iter().map_err(DbError::from_io)?)) } else { Ok(None) });
+            let iter_table = self.get_table::<K>().and_then(|table| if let Some(tbl) = table { Ok(Some(tbl.iter().map_err(ArchiveError::from_io)?)) } else { Ok(None) });
             let (ok, err) = match iter_table {
                 Ok(val) => (Some(val), None),
                 Err(val) => (None, Some(val))
@@ -89,14 +89,14 @@ impl<'a, M: Mutability, D> Transaction<'a, M, D> {
             err.map(Err).into_iter().chain(ok.and_then(std::convert::identity)
                 .into_iter()
                 .flat_map(std::convert::identity)
-                .map(|x| x.map_err(DbError::from_io)
-                    .and_then(|(k, _)| Ok(transmute(<<<D as DataTable<K>>::Key as BinaryConverter<'static>>::ValueConverter>::apply(transmute(k))?)))))
+                .map(|x| x.map_err(ArchiveError::from_io)
+                    .and_then(|(k, _)| Ok(transmute(<<<D as ArchiveType<K>>::Key as BinaryConverter<'static>>::ValueConverter>::apply(transmute(k))?)))))
         }
     }
 
-    pub fn values<K: 'static>(&self) -> impl '_ + Iterator<Item = Result<<<D as DataTable<K>>::Value as DataLoad<'_>>::OutputType, DbError>> where D: DataTable<K> {
+    pub fn values<K: 'static + ?Sized>(&self) -> impl '_ + Iterator<Item = Result<<<D as ArchiveType<K>>::Value as DataLoad<'_>>::OutputType, ArchiveError>> where D: ArchiveType<K> {
         unsafe {
-            let iter_table = self.get_table::<K>().and_then(|table| if let Some(tbl) = table { Ok(Some(tbl.iter().map_err(DbError::from_io)?)) } else { Ok(None) });
+            let iter_table = self.get_table::<K>().and_then(|table| if let Some(tbl) = table { Ok(Some(tbl.iter().map_err(ArchiveError::from_io)?)) } else { Ok(None) });
             let (ok, err) = match iter_table {
                 Ok(val) => (Some(val), None),
                 Err(val) => (None, Some(val))
@@ -105,14 +105,14 @@ impl<'a, M: Mutability, D> Transaction<'a, M, D> {
             err.map(Err).into_iter().chain(ok.and_then(std::convert::identity)
                 .into_iter()
                 .flat_map(std::convert::identity)
-                .map(|x| x.map_err(DbError::from_io)
-                    .and_then(|(_, v)| Ok(transmute(<<<D as DataTable<K>>::Value as DataLoad<'static>>::OutputConverter>::apply(transmute(v))?)))))
+                .map(|x| x.map_err(ArchiveError::from_io)
+                    .and_then(|(_, v)| Ok(transmute(<<<D as ArchiveType<K>>::Value as DataLoad<'static>>::OutputConverter>::apply(transmute(v))?)))))
         }
     }
 
-    pub fn iter<K: 'static>(&self) -> impl '_ + Iterator<Item = Result<(<<D as DataTable<K>>::Key as BinaryConverter<'_>>::ValueOutput, <<D as DataTable<K>>::Value as DataLoad<'_>>::OutputType), DbError>> where D: DataTable<K> {
+    pub fn iter<K: 'static + ?Sized>(&self) -> impl '_ + Iterator<Item = Result<(<<D as ArchiveType<K>>::Key as BinaryConverter<'_>>::ValueOutput, <<D as ArchiveType<K>>::Value as DataLoad<'_>>::OutputType), ArchiveError>> where D: ArchiveType<K> {
         unsafe {
-            let iter_table = self.get_table::<K>().and_then(|table| if let Some(tbl) = table { Ok(Some(tbl.iter().map_err(DbError::from_io)?)) } else { Ok(None) });
+            let iter_table = self.get_table::<K>().and_then(|table| if let Some(tbl) = table { Ok(Some(tbl.iter().map_err(ArchiveError::from_io)?)) } else { Ok(None) });
             let (ok, err) = match iter_table {
                 Ok(val) => (Some(val), None),
                 Err(val) => (None, Some(val))
@@ -121,17 +121,17 @@ impl<'a, M: Mutability, D> Transaction<'a, M, D> {
             err.map(Err).into_iter().chain(ok.and_then(std::convert::identity)
                 .into_iter()
                 .flat_map(std::convert::identity)
-                .map(|x| x.map_err(DbError::from_io)
+                .map(|x| x.map_err(ArchiveError::from_io)
                     .and_then(|(k, v)| Ok((
-                        transmute(<<<D as DataTable<K>>::Key as BinaryConverter<'static>>::ValueConverter>::apply(transmute(k))?),
-                        transmute(<<<D as DataTable<K>>::Value as DataLoad<'static>>::OutputConverter>::apply(transmute(v))?)
+                        transmute(<<<D as ArchiveType<K>>::Key as BinaryConverter<'static>>::ValueConverter>::apply(transmute(k))?),
+                        transmute(<<<D as ArchiveType<K>>::Value as DataLoad<'static>>::OutputConverter>::apply(transmute(v))?)
                 )))))
         }
     }
 
-    fn get_table<K: 'static>(&self) -> Result<Option<&M::TableType<'static, 'static, <<<D as DataTable<K>>::Key as BinaryConverter<'static>>::ByteOutput as IntoBytes>::RefType, <<D as DataTable<K>>::Value as DataLoad<'static>>::RawValueType>>, DbError> where D: DataTable<K> {
+    fn get_table<K: 'static + ?Sized>(&self) -> Result<Option<&M::TableType<'static, 'static, <<<D as ArchiveType<K>>::Key as BinaryConverter<'static>>::ByteOutput as IntoBytes>::RefType, <<D as ArchiveType<K>>::Value as DataLoad<'static>>::RawValueType>>, ArchiveError> where D: ArchiveType<K> {
         unsafe {
-            let table_def = TableDefinition::<'static, <<<D as DataTable<K>>::Key as BinaryConverter<'static>>::ByteOutput as IntoBytes>::RefType, <<D as DataTable<K>>::Value as DataLoad<'static>>::RawValueType>::new(D::table_name());
+            let table_def = TableDefinition::<'static, <<<D as ArchiveType<K>>::Key as BinaryConverter<'static>>::ByteOutput as IntoBytes>::RefType, <<D as ArchiveType<K>>::Value as DataLoad<'static>>::RawValueType>::new(D::type_name());
             let guard = self.table_lock.read().expect("Could not acquire table lock.");
             if let Some(table) = &*self.tables.get() {
                 if table.id == TypeId::of::<K>() {
@@ -149,6 +149,7 @@ impl<'a, M: Mutability, D> Transaction<'a, M, D> {
                     }
 
                     drop(guard);
+                    #[allow(unused)]
                     let write_guard = self.table_lock.write().expect("Could not acquire table lock.");
                     Ok(M::open_table(transmute(&**self.txn.as_ref().expect("Could not get transaction.")), table_def)?.map(|table| (*base_node.get()).insert(Box::new(RawTableNode {
                         id: TypeId::of::<K>(),
@@ -159,6 +160,7 @@ impl<'a, M: Mutability, D> Transaction<'a, M, D> {
             }
             else {
                 drop(guard);
+                #[allow(unused)]
                 let write_guard = self.table_lock.write().expect("Could not acquire table lock.");
                 Ok(M::open_table(transmute(&**self.txn.as_ref().expect("Could not get transaction.")), table_def)?.map(|table| (*self.tables.get()).insert(RawTableNode {
                     id: TypeId::of::<K>(),
@@ -182,34 +184,34 @@ impl<'a, M: Mutability, D> Transaction<'a, M, D> {
 }
 
 impl<'a, D> Transaction<'a, Mut, D> {
-    pub fn commit(mut self) -> Result<(), DbError> {
+    pub fn commit(mut self) -> Result<(), ArchiveError> {
         unsafe {
             self.drop_tables();
-            take(&mut self.txn).expect("Could not get transaction.").commit().map_err(DbError::from_io)
+            take(&mut self.txn).expect("Could not get transaction.").commit().map_err(ArchiveError::from_io)
         }
     }
 
-    pub fn set<K: 'static, V: 'a>(&mut self, key: &K, value: &V) -> Result<(), DbError> where D: DataTable<K>, <D as DataTable<K>>::Value: BinaryConverter<'a, Target = V>, 
-    <<<<D as DataTable<K>>::Value as BinaryConverter<'a>>::ByteOutput as private::IntoBytes>::RefType as redb::RedbValue>::SelfType<'a>: std::borrow::Borrow<<<<D as DataTable<K>>::Value as DataLoad<'a>>::RawValueType as redb::RedbValue>::SelfType<'a>> {
+    pub fn set<K: 'static + ?Sized, V: 'a + ?Sized>(&mut self, key: &K, value: &V) -> Result<(), ArchiveError> where D: ArchiveType<K>, <D as ArchiveType<K>>::Value: BinaryConverter<'a, Target = V>, 
+    <<<<D as ArchiveType<K>>::Value as BinaryConverter<'a>>::ByteOutput as private::IntoBytes>::RefType as redb::RedbValue>::SelfType<'a>: std::borrow::Borrow<<<<D as ArchiveType<K>>::Value as DataLoad<'a>>::RawValueType as redb::RedbValue>::SelfType<'a>> {
         unsafe {
             let table = self.get_table_mut::<K>()?;
-            let raw_key = <<<D as DataTable<K>>::Key as BinaryConverter<'a>>::ByteConverter>::apply(transmute(key))?.into_db_value()?;
-            let raw_value = <<<D as DataTable<K>>::Value as BinaryConverter<'a>>::ByteConverter>::apply(transmute(value))?.into_db_value()?;
-            table.insert(raw_key.as_ref(), transmute::<_, &'static _>(&raw_value.as_ref())).map_err(DbError::from_io)?;
+            let raw_key = <<<D as ArchiveType<K>>::Key as BinaryConverter<'a>>::ByteConverter>::apply(transmute(key))?.into_db_value()?;
+            let raw_value = <<<D as ArchiveType<K>>::Value as BinaryConverter<'a>>::ByteConverter>::apply(transmute(value))?.into_db_value()?;
+            table.insert(raw_key.as_ref(), transmute::<_, &'static _>(&raw_value.as_ref())).map_err(ArchiveError::from_io)?;
             Ok(())
         }
     }
 
-    pub fn swap<K: 'static, V: 'a>(&mut self, key: &K, value: &V) -> Result<Option<<<D as DataTable<K>>::Value as DataLoad<'_>>::OutputType>, DbError> where D: DataTable<K>, <D as DataTable<K>>::Value: BinaryConverter<'a, Target = V>, 
-    <<<<D as DataTable<K>>::Value as BinaryConverter<'a>>::ByteOutput as private::IntoBytes>::RefType as redb::RedbValue>::SelfType<'a>: std::borrow::Borrow<<<<D as DataTable<K>>::Value as DataLoad<'a>>::RawValueType as redb::RedbValue>::SelfType<'a>> {
+    pub fn swap<K: 'static + ?Sized, V: 'a + ?Sized>(&mut self, key: &K, value: &V) -> Result<Option<<<D as ArchiveType<K>>::Value as DataLoad<'_>>::OutputType>, ArchiveError> where D: ArchiveType<K>, <D as ArchiveType<K>>::Value: BinaryConverter<'a, Target = V>, 
+    <<<<D as ArchiveType<K>>::Value as BinaryConverter<'a>>::ByteOutput as private::IntoBytes>::RefType as redb::RedbValue>::SelfType<'a>: std::borrow::Borrow<<<<D as ArchiveType<K>>::Value as DataLoad<'a>>::RawValueType as redb::RedbValue>::SelfType<'a>> {
         unsafe {
             let table = self.get_table_mut::<K>()?;
-            let raw_key = <<<D as DataTable<K>>::Key as BinaryConverter<'a>>::ByteConverter>::apply(transmute(key))?.into_db_value()?;
-            let raw_value = <<<D as DataTable<K>>::Value as BinaryConverter<'a>>::ByteConverter>::apply(transmute(value))?.into_db_value()?;
-            let maybe_old_value = table.insert(raw_key.as_ref(), transmute::<_, &'static _>(&raw_value.as_ref())).map_err(DbError::from_io)?;
+            let raw_key = <<<D as ArchiveType<K>>::Key as BinaryConverter<'a>>::ByteConverter>::apply(transmute(key))?.into_db_value()?;
+            let raw_value = <<<D as ArchiveType<K>>::Value as BinaryConverter<'a>>::ByteConverter>::apply(transmute(value))?.into_db_value()?;
+            let maybe_old_value = table.insert(raw_key.as_ref(), transmute::<_, &'static _>(&raw_value.as_ref())).map_err(ArchiveError::from_io)?;
 
             if let Some(old_value) = maybe_old_value {
-                Ok(Some(transmute(<<<D as DataTable<K>>::Value as DataLoad<'a>>::OutputConverter>::apply(transmute(old_value))?)))
+                Ok(Some(transmute(<<<D as ArchiveType<K>>::Value as DataLoad<'a>>::OutputConverter>::apply(transmute(old_value))?)))
             }
             else {
                 Ok(None)
@@ -217,14 +219,14 @@ impl<'a, D> Transaction<'a, Mut, D> {
         }
     }
 
-    pub fn remove<K: 'static>(&mut self, key: &K) -> Result<Option<<<D as DataTable<K>>::Value as DataLoad<'_>>::OutputType>, DbError> where D: DataTable<K> {
+    pub fn remove<K: 'static + ?Sized>(&mut self, key: &K) -> Result<Option<<<D as ArchiveType<K>>::Value as DataLoad<'_>>::OutputType>, ArchiveError> where D: ArchiveType<K> {
         unsafe {
             let table = self.get_table_mut::<K>()?;
-            let raw_key = <<<D as DataTable<K>>::Key as BinaryConverter<'a>>::ByteConverter>::apply(transmute(key))?.into_db_value()?;
-            let maybe_old_value = table.remove(raw_key.as_ref()).map_err(DbError::from_io)?;
+            let raw_key = <<<D as ArchiveType<K>>::Key as BinaryConverter<'a>>::ByteConverter>::apply(transmute(key))?.into_db_value()?;
+            let maybe_old_value = table.remove(raw_key.as_ref()).map_err(ArchiveError::from_io)?;
 
             if let Some(old_value) = maybe_old_value {
-                Ok(Some(transmute(<<<D as DataTable<K>>::Value as DataLoad<'a>>::OutputConverter>::apply(transmute(old_value))?)))
+                Ok(Some(transmute(<<<D as ArchiveType<K>>::Value as DataLoad<'a>>::OutputConverter>::apply(transmute(old_value))?)))
             }
             else {
                 Ok(None)
@@ -232,9 +234,9 @@ impl<'a, D> Transaction<'a, Mut, D> {
         }
     }
 
-    fn get_table_mut<K: 'static>(&mut self) -> Result<&mut Table<'static, 'static, <<<D as DataTable<K>>::Key as BinaryConverter<'a>>::ByteOutput as IntoBytes>::RefType, <<D as DataTable<K>>::Value as DataLoad<'a>>::RawValueType>, DbError> where D: DataTable<K> {
+    fn get_table_mut<K: 'static + ?Sized>(&mut self) -> Result<&mut Table<'static, 'static, <<<D as ArchiveType<K>>::Key as BinaryConverter<'a>>::ByteOutput as IntoBytes>::RefType, <<D as ArchiveType<K>>::Value as DataLoad<'a>>::RawValueType>, ArchiveError> where D: ArchiveType<K> {
         unsafe {
-            let table_def = TableDefinition::<'static, <<<D as DataTable<K>>::Key as BinaryConverter<'a>>::ByteOutput as IntoBytes>::RefType, <<D as DataTable<K>>::Value as DataLoad<'a>>::RawValueType>::new(D::table_name());
+            let table_def = TableDefinition::<'static, <<<D as ArchiveType<K>>::Key as BinaryConverter<'a>>::ByteOutput as IntoBytes>::RefType, <<D as ArchiveType<K>>::Value as DataLoad<'a>>::RawValueType>::new(D::type_name());
             if let Some(table) = &mut *self.tables.get() {
                 if table.id == TypeId::of::<K>() {
                     Ok(table.table.cast_mut())
@@ -278,73 +280,82 @@ impl<'a, M: Mutability, D> Drop for Transaction<'a, M, D> {
     }
 }
 
-pub trait DataTable<K: 'static + ?Sized> {
-    type Key: for<'a> BinaryConverter<'a, Target = K>;
-    type Value: for<'a> DataLoad<'a>;
+pub trait DataConverter: for<'a> DataTransform<'a, &'a Self::Target, ToArchive> {
+    type Target: 'static + ?Sized;
+}
 
-    fn table_name() -> &'static str {
+impl DataConverter for [u8] {
+    type Target = Self;
+}
+
+pub trait DataTransform<'a, I: 'a + ?Sized, D: Direction> {
+    type Output;
+
+    fn apply(input: I) -> Result<Self::Output, ArchiveError>;
+}
+
+impl<const N: usize> DataConverter for [u8; N] {
+    type Target = Self;
+}
+
+impl<'a, const N: usize> DataTransform<'a, &'a [u8; N], ToArchive> for [u8; N] {
+    type Output = &'a Self;
+
+    fn apply(input: &'a [u8; N]) -> Result<Self::Output, ArchiveError> {
+        Ok(input)
+    }
+}
+
+impl<'a, const N: usize> DataTransform<'a, AccessGuard<'a, &'static [u8; N]>, FromArchive> for [u8; N] {
+    type Output = AccessGuard<'a, &'static [u8; N]>;
+
+    fn apply(input: AccessGuard<'a, &'static [u8; N]>) -> Result<Self::Output, ArchiveError> {
+        Ok(input)
+    }
+}
+
+impl<'a> DataTransform<'a, &'a [u8], ToArchive> for [u8] {
+    type Output = &'a Self;
+
+    fn apply(input: &'a [u8]) -> Result<Self::Output, ArchiveError> {
+        Ok(input)
+    }
+}
+
+impl<'a> DataTransform<'a, AccessGuard<'a, &'static [u8]>, FromArchive> for [u8] {
+    type Output = AccessGuard<'a, &'static [u8]>;
+
+    fn apply(input: AccessGuard<'a, &'static [u8]>) -> Result<Self::Output, ArchiveError> {
+        Ok(input)
+    }
+}
+
+pub trait ArchiveType<K: 'static + ?Sized> {
+    type Key: for<'a> BinaryConverter<'a, Target = K> + ?Sized;
+    type Value: for<'a> DataLoad<'a> + ?Sized;
+
+    fn type_name() -> &'static str {
         trim_name(type_name::<K>())
     }
 }
 
-pub trait DataConverter: for<'a> DataTransform<'a, &'a Self::Target, ToArchive> {
-    type Target: 'static;
-}
-
-pub trait DataTransform<'a, I: 'a, D: Direction> {
-    type Output;
-
-    fn apply(input: I) -> Result<Self::Output, DbError>;
-}
-
 pub trait ToWriter {
-    fn write<W: std::io::Write>(self, writer: W) -> Result<(), DbError>;
+    fn write<W: std::io::Write>(self, writer: W) -> Result<(), ArchiveError>;
 }
 
-pub trait DataLoad<'a>
-{
-    type OutputType;
-    type OutputConverter: DataTransform<'a, AccessGuard<'a, Self::RawValueType>, FromArchive, Output = Self::OutputType>;
-    type RawValueType: 'static + RedbKey;
-
-    //fn load<K: 'static + RedbKey>(table: &'a impl ReadableTable<K, Self::RawValueType>, key: K::SelfType<'a>) -> Result<Option<Self::OutputType>, DbError>;
-}
-
-/*
-pub trait DataStore<'a, I: 'a>: DataLoad<'a> {
-    fn remove<K: 'static + RedbKey>(table: &mut Table<'_, '_, K, Self::RawValueType>, key: K::SelfType<'a>) -> Result<<Self as DataLoad<'a>>::OutputType, DbError>;
-    fn store<K: 'static + RedbKey>(table: &mut Table<'_, '_, K, Self::RawValueType>, key: K::SelfType<'a>, value: I) -> Result<(), DbError>;
-    fn swap<K: 'static + RedbKey>(table: &mut Table<'_, '_, K, Self::RawValueType>, key: K::SelfType<'a>, value: I) -> Result<<Self as DataLoad<'a>>::OutputType, DbError>;
-} */
-
-pub trait BinaryConverter<'a>: DataConverter {
-    type ByteOutput: IntoBytes;
-    type ByteConverter: DataTransform<'a, &'a Self::Target, ToArchive, Output = Self::ByteOutput>;
-    type ValueOutput;
-    type ValueConverter: DataTransform<'a, AccessGuard<'a, <Self::ByteOutput as IntoBytes>::RefType>, FromArchive, Output = Self::ValueOutput>;
-}
-
-impl<'a, T: DataConverter> BinaryConverter<'a> for T
-where <T as DataTransform<'a, &'a T::Target, ToArchive>>::Output: IntoBytes,
-T: DataTransform<'a, AccessGuard<'a, <<T as DataTransform<'a, &'a T::Target, ToArchive>>::Output as IntoBytes>::RefType>, FromArchive>
-{
-    type ByteOutput = <T as DataTransform<'a, &'a T::Target, ToArchive>>::Output;
-    type ByteConverter = Self;
-    type ValueOutput = <T as DataTransform<'a, AccessGuard<'a, <<T as DataTransform<'a, &'a T::Target, ToArchive>>::Output as IntoBytes>::RefType>, FromArchive>>::Output;
-    type ValueConverter = Self;
-}
-
-impl<'a, T: BinaryConverter<'a>> DataLoad<'a> for T
-where <T as DataTransform<'a, &'a T::Target, ToArchive>>::Output: IntoBytes,
-T: DataTransform<'a, AccessGuard<'a, <<T as DataTransform<'a, &'a T::Target, ToArchive>>::Output as IntoBytes>::RefType>, FromArchive>
-+ DataTransform<'a, AccessGuard<'a, <<T as BinaryConverter<'a>>::ByteOutput as IntoBytes>::RefType>, FromArchive>,
-{
-    type OutputType = <T as DataTransform<'a, AccessGuard<'a, <<T as DataTransform<'a, &'a T::Target, ToArchive>>::Output as IntoBytes>::RefType>, FromArchive>>::Output;
-    type OutputConverter = Self;//<T as DataTransform<'a, AccessGuard<'a, <<T as DataTransform<'a, &'a T::Target, ToArchive>>::Output as IntoBytes>::RefType>, FromArchive>>::Output;
-    type RawValueType = <<T as DataTransform<'a, &'a T::Target, ToArchive>>::Output as IntoBytes>::RefType;
+impl<'a> ToWriter for &'a [u8] {
+    fn write<W: std::io::Write>(self, mut writer: W) -> Result<(), ArchiveError> {
+        writer.write_all(self).map_err(ArchiveError::from_io)
+    }
 }
 
 pub struct AccessGuard<'a, V: RedbValue>(redb::AccessGuard<'a, V>);
+
+impl<'a, T: std::fmt::Debug + RedbValue> std::fmt::Debug for AccessGuard<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("AccessGuard").field(&self.0.value()).finish()
+    }
+}
 
 impl<'a, const N: usize> AsRef<[u8; N]> for AccessGuard<'a, &[u8; N]> {
     fn as_ref(&self) -> &[u8; N] {
@@ -367,7 +378,7 @@ pub struct ToArchive;
 pub struct FromArchive;
 
 #[derive(Debug, Error)]
-pub enum DbError {
+pub enum ArchiveError {
     #[error("Error interacting with database: {0}")]
     Io(Box<dyn Send + Sync + std::error::Error>),
     #[error("Error serializing data: {0}")]
@@ -376,7 +387,7 @@ pub enum DbError {
     Deserialize(Box<dyn Send + Sync + std::error::Error>)
 }
 
-impl DbError {
+impl ArchiveError {
     pub fn from_io(x: impl 'static + Send + Sync + std::error::Error) -> Self {
         Self::Io(x.into())
     }
@@ -426,7 +437,7 @@ struct RawTableNode<M: Mutability> {
 }
 
 fn trim_name(name: &'static str) -> &'static str {
-    if let Some(last) = name.rfind(":") {
+    if let Some(last) = name.rfind(':') {
         &name[last..]
     }
     else {
@@ -446,18 +457,18 @@ mod private {
         type TableType<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue>: ReadableTable<K, V>;
         type TransactionType<'a>;
 
-        fn open_table<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue>(x: &'a Self::TransactionType<'b>, definition: TableDefinition<'_, K, V>) -> Result<Option<Self::TableType<'a, 'b, K, V>>, DbError>;
+        fn open_table<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue>(x: &'a Self::TransactionType<'b>, definition: TableDefinition<'_, K, V>) -> Result<Option<Self::TableType<'a, 'b, K, V>>, ArchiveError>;
     }
 
     impl Mutability for Const {
         type TableType<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue> = ReadOnlyTable<'a, K, V>;
         type TransactionType<'a> = ReadTransaction<'a>;
 
-        fn open_table<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue>(x: &'a Self::TransactionType<'b>, definition: TableDefinition<'_, K, V>) -> Result<Option<Self::TableType<'a, 'b, K, V>>, DbError> {
+        fn open_table<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue>(x: &'a Self::TransactionType<'b>, definition: TableDefinition<'_, K, V>) -> Result<Option<Self::TableType<'a, 'b, K, V>>, ArchiveError> {
             match x.open_table(definition) {
                 Ok(res) => Ok(Some(res)),
                 Err(TableError::TableDoesNotExist(_)) => Ok(None),
-                Err(err) => Err(DbError::from_io(err))
+                Err(err) => Err(ArchiveError::from_io(err))
             }
         }
     }
@@ -466,8 +477,8 @@ mod private {
         type TableType<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue> = Table<'a, 'b, K, V>;
         type TransactionType<'a> = WriteTransaction<'a>;
 
-        fn open_table<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue>(x: &'a Self::TransactionType<'b>, definition: TableDefinition<'_, K, V>) -> Result<Option<Self::TableType<'a, 'b, K, V>>, DbError> {
-            x.open_table(definition).map_err(DbError::from_io).map(Some)
+        fn open_table<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue>(x: &'a Self::TransactionType<'b>, definition: TableDefinition<'_, K, V>) -> Result<Option<Self::TableType<'a, 'b, K, V>>, ArchiveError> {
+            x.open_table(definition).map_err(ArchiveError::from_io).map(Some)
         }
     }
 
@@ -475,14 +486,14 @@ mod private {
         type ByteType: AsByteRef<Self::RefType>;
         type RefType: 'static + RedbKey;
 
-        fn into_db_value(self) -> Result<Self::ByteType, DbError>;
+        fn into_db_value(self) -> Result<Self::ByteType, ArchiveError>;
     }
 
     impl<'a> IntoBytes for &'a [u8] {
         type ByteType = Self;
         type RefType = &'static [u8];
 
-        fn into_db_value(self) -> Result<Self::ByteType, DbError> {
+        fn into_db_value(self) -> Result<Self::ByteType, ArchiveError> {
             Ok(self)
         }
     }
@@ -491,21 +502,8 @@ mod private {
         type ByteType = Self;
         type RefType = &'static [u8; N];
 
-        fn into_db_value(self) -> Result<Self::ByteType, DbError> {
+        fn into_db_value(self) -> Result<Self::ByteType, ArchiveError> {
             Ok(self)
-        }
-    }
-
-    impl<T: ToWriter> IntoBytes for T {
-        type ByteType = Vec<u8>;
-        type RefType = &'static [u8];
-
-        fn into_db_value(self) -> Result<Self::ByteType, DbError> {
-            const DEFAULT_SIZE: usize = usize::BITS as usize;
-
-            let mut result = Vec::with_capacity(DEFAULT_SIZE);
-            self.write(&mut result)?;
-            Ok(result)
         }
     }
 
@@ -530,6 +528,39 @@ mod private {
             &self[..]
         }
     }
+    
+    pub trait BinaryConverter<'a>: DataConverter {
+        type ByteOutput: IntoBytes;
+        type ByteConverter: DataTransform<'a, &'a Self::Target, ToArchive, Output = Self::ByteOutput> + ?Sized;
+        type ValueOutput;
+        type ValueConverter: DataTransform<'a, AccessGuard<'a, <Self::ByteOutput as IntoBytes>::RefType>, FromArchive, Output = Self::ValueOutput> + ?Sized;
+    }
+
+    impl<'a, T: DataConverter + ?Sized> BinaryConverter<'a> for T
+    where <T as DataTransform<'a, &'a T::Target, ToArchive>>::Output: IntoBytes,
+    T: DataTransform<'a, AccessGuard<'a, <<T as DataTransform<'a, &'a T::Target, ToArchive>>::Output as IntoBytes>::RefType>, FromArchive>
+    {
+        type ByteOutput = <T as DataTransform<'a, &'a T::Target, ToArchive>>::Output;
+        type ByteConverter = Self;
+        type ValueOutput = <T as DataTransform<'a, AccessGuard<'a, <<T as DataTransform<'a, &'a T::Target, ToArchive>>::Output as IntoBytes>::RefType>, FromArchive>>::Output;
+        type ValueConverter = Self;
+    }
+
+    impl<'a, T: BinaryConverter<'a> + ?Sized> DataLoad<'a> for T
+    where <T as DataTransform<'a, &'a T::Target, ToArchive>>::Output: IntoBytes,
+    T: DataTransform<'a, AccessGuard<'a, <<T as DataTransform<'a, &'a T::Target, ToArchive>>::Output as IntoBytes>::RefType>, FromArchive>
+    + DataTransform<'a, AccessGuard<'a, <<T as BinaryConverter<'a>>::ByteOutput as IntoBytes>::RefType>, FromArchive>,
+    {
+        type OutputType = <T as DataTransform<'a, AccessGuard<'a, <<T as DataTransform<'a, &'a T::Target, ToArchive>>::Output as IntoBytes>::RefType>, FromArchive>>::Output;
+        type OutputConverter = Self;
+        type RawValueType = <<T as DataTransform<'a, &'a T::Target, ToArchive>>::Output as IntoBytes>::RefType;
+    }
+    
+    pub trait DataLoad<'a> {
+        type OutputType;
+        type OutputConverter: DataTransform<'a, AccessGuard<'a, Self::RawValueType>, FromArchive, Output = Self::OutputType> + ?Sized;
+        type RawValueType: 'static + RedbKey;
+    }
 }
 
 #[cfg(test)]
@@ -537,13 +568,18 @@ mod tests {
     use super::*;
 
     struct MyDb;
+
+    impl ArchiveType<[u8; 3]> for MyDb {
+        type Key = [u8; 3];
+        type Value = zstd::Zstd<[u8]>;
+    }
     
-    impl DataTable<u32> for MyDb {
+    impl ArchiveType<u32> for MyDb {
         type Key = bytemuck::Pod<u32>;
         type Value = zstd::Zstd<rmp_serde::Rmp<String>>;
     }
     
-    impl DataTable<i64> for MyDb {
+    impl ArchiveType<i64> for MyDb {
         type Key = bytemuck::Pod<i64>;
         type Value = bytemuck::Pod<u16>;
     }
@@ -554,11 +590,12 @@ mod tests {
         let mut txn = x.write().unwrap();
         txn.set(&25u32, &"henlo".to_string()).unwrap();
         txn.set(&28u32, &"fren".to_string()).unwrap();
-        txn.set(&40i64, &26);
+        txn.set(&40i64, &26).unwrap();
         println!("Swapped {:?}", txn.swap(&25u32, &"goodby".to_string()));
+        txn.set(&[2u8, 4, 0], &[31, 24, 7][..]).unwrap();
         txn.commit().unwrap();
         let txn = x.read().unwrap();
-        for value in txn.iter::<u32>() {
+        for value in txn.iter::<[u8; 3]>() {
             println!("VALUE {value:?}");
         }
     }
