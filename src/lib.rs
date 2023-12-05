@@ -314,8 +314,8 @@ impl<'a, D> Transaction<'a, Mut, D> {
         }
     }
 
-    pub fn set<K: 'static + ?Sized, V: 'a + ?Sized>(&mut self, key: &K, value: &V) -> Result<(), ArchiveError> where D: ArchiveType<K>, <D as ArchiveType<K>>::Value: BinaryConverter<'a, Target = V>,
-    <<<<D as ArchiveType<K>>::Value as BinaryConverter<'a>>::ByteOutput as private::IntoBytes>::RefType as redb::RedbValue>::SelfType<'a>: std::borrow::Borrow<<<<D as ArchiveType<K>>::Value as DataLoad<'a>>::RawValueType as redb::RedbValue>::SelfType<'a>>{
+    pub fn set<'b, K: 'static + ?Sized, V: 'b + ?Sized>(&'b mut self, key: &K, value: &V) -> Result<(), ArchiveError> where D: ArchiveType<K>, <D as ArchiveType<K>>::Value: BinaryConverter<'b, Target = V>,
+    <<<<D as ArchiveType<K>>::Value as BinaryConverter<'b>>::ByteOutput as private::IntoBytes>::RefType as redb::RedbValue>::SelfType<'b>: std::borrow::Borrow<<<<D as ArchiveType<K>>::Value as DataLoad<'b>>::RawValueType as redb::RedbValue>::SelfType<'b>>{
         unsafe {
             let table = self.get_table_mut::<K>()?;
             let raw_key =
@@ -324,7 +324,7 @@ impl<'a, D> Transaction<'a, Mut, D> {
                 )?
                 .into_db_value()?;
             let raw_value =
-                <<<D as ArchiveType<K>>::Value as BinaryConverter<'a>>::ByteConverter>::apply(
+                <<<D as ArchiveType<K>>::Value as BinaryConverter<'b>>::ByteConverter>::apply(
                     transmute(value),
                 )?
                 .into_db_value()?;
@@ -338,8 +338,8 @@ impl<'a, D> Transaction<'a, Mut, D> {
         }
     }
 
-    pub fn swap<K: 'static + ?Sized, V: 'a + ?Sized>(&mut self, key: &K, value: &V) -> Result<Option<<<D as ArchiveType<K>>::Value as DataLoad<'_>>::OutputType>, ArchiveError> where D: ArchiveType<K>, <D as ArchiveType<K>>::Value: BinaryConverter<'a, Target = V>,
-    <<<<D as ArchiveType<K>>::Value as BinaryConverter<'a>>::ByteOutput as private::IntoBytes>::RefType as redb::RedbValue>::SelfType<'a>: std::borrow::Borrow<<<<D as ArchiveType<K>>::Value as DataLoad<'a>>::RawValueType as redb::RedbValue>::SelfType<'a>>{
+    pub fn swap<'b, K: 'static + ?Sized, V: 'b + ?Sized>(&'b mut self, key: &K, value: &V) -> Result<Option<<<D as ArchiveType<K>>::Value as DataLoad<'_>>::OutputType>, ArchiveError> where D: ArchiveType<K>, <D as ArchiveType<K>>::Value: BinaryConverter<'b, Target = V>,
+    <<<<D as ArchiveType<K>>::Value as BinaryConverter<'b>>::ByteOutput as private::IntoBytes>::RefType as redb::RedbValue>::SelfType<'b>: std::borrow::Borrow<<<<D as ArchiveType<K>>::Value as DataLoad<'b>>::RawValueType as redb::RedbValue>::SelfType<'b>>{
         unsafe {
             let table = self.get_table_mut::<K>()?;
             let raw_key =
@@ -348,7 +348,7 @@ impl<'a, D> Transaction<'a, Mut, D> {
                 )?
                 .into_db_value()?;
             let raw_value =
-                <<<D as ArchiveType<K>>::Value as BinaryConverter<'a>>::ByteConverter>::apply(
+                <<<D as ArchiveType<K>>::Value as BinaryConverter<'b>>::ByteConverter>::apply(
                     transmute(value),
                 )?
                 .into_db_value()?;
@@ -468,6 +468,9 @@ impl<'a, D> Transaction<'a, Mut, D> {
         }
     }
 }
+
+unsafe impl<'a, M: Mutability, D> Send for Transaction<'a, M, D> { }
+unsafe impl<'a, M: Mutability, D> Sync for Transaction<'a, M, D> { }
 
 impl<'a, M: Mutability, D> Drop for Transaction<'a, M, D> {
     fn drop(&mut self) {
