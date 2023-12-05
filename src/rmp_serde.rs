@@ -1,7 +1,7 @@
-use crate::*;
 use crate::rmp_serde::private::*;
-use ::rmp_serde::*;
+use crate::*;
 use ::rmp_serde::encode::*;
+use ::rmp_serde::*;
 use serde::de::*;
 
 pub struct Rmp<T: 'static + Serialize + DeserializeOwned>(PhantomData<T>);
@@ -18,7 +18,9 @@ impl<'a, T: Serialize + DeserializeOwned> DataTransform<'a, &'a T, ToArchive> fo
     }
 }
 
-impl<'a, T: Serialize + DeserializeOwned, I: 'a + std::io::Read> DataTransform<'a, I, FromArchive> for Rmp<T> {
+impl<'a, T: Serialize + DeserializeOwned, I: 'a + std::io::Read> DataTransform<'a, I, FromArchive>
+    for Rmp<T>
+{
     type Output = T;
 
     fn apply(input: I) -> Result<Self::Output, ArchiveError> {
@@ -26,7 +28,9 @@ impl<'a, T: Serialize + DeserializeOwned, I: 'a + std::io::Read> DataTransform<'
     }
 }
 
-impl<'a, T: Serialize + DeserializeOwned> DataTransform<'a, AccessGuard<'a, &'static [u8]>, FromArchive> for Rmp<T> {
+impl<'a, T: Serialize + DeserializeOwned>
+    DataTransform<'a, AccessGuard<'a, &'static [u8]>, FromArchive> for Rmp<T>
+{
     type Output = T;
 
     fn apply(input: AccessGuard<'a, &'static [u8]>) -> Result<Self::Output, ArchiveError> {
