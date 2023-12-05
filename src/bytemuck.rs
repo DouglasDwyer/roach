@@ -2,6 +2,7 @@ use ::bytemuck::*;
 use crate::*;
 use std::marker::*;
 use std::mem::*;
+use std::ops::*;
 
 pub struct Pod<T: ::bytemuck::Pod + Zeroable>(PhantomData<T>);
 
@@ -20,12 +21,27 @@ impl<'a, T: 'a + ::bytemuck::Pod + Zeroable> DataTransform<'a, &'a T, ToArchive>
 }
 
 impl<'a, T: ::bytemuck::Pod + Zeroable, I: 'a + AsRef<[u8; size_of::<T>()]>> DataTransform<'a, I, FromArchive> for Pod<T> where [(); size_of::<T>()]: {
-    type Output = &'a T;
+    type Output = PodGuard<T, I>;
 
     fn apply(input: I) -> Result<Self::Output, DbError> {
-        //try_from_bytes::<T>(input.as_ref()).map_err(|x| DbError::Deserialize(Box::new(x)))
+        Ok(PodGuard(input, PhantomData))
+    }
+}
+
+pub struct PodGuard<T: ::bytemuck::Pod + Zeroable, I: AsRef<[u8; size_of::<T>()]>>(I, PhantomData<T>);
+
+impl<T: std::fmt::Debug + ::bytemuck::Pod, I: AsRef<[u8; size_of::<T>()]>> std::fmt::Debug for PodGuard<T, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("PodGuard").field(&**self).finish()
+    }
+}
+
+impl<T: ::bytemuck::Pod + Zeroable, I: AsRef<[u8; size_of::<T>()]>> Deref for PodGuard<T, I> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
         unsafe {
-            Ok(transmute(input.as_ref()))
+            transmute(self.0.as_ref())
         }
     }
 }

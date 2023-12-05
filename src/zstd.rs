@@ -44,7 +44,6 @@ fn create_default_compression_context() -> Result<CCtx<'static>, ErrorCode> {
     ctx.set_parameter(CParameter::ChecksumFlag(false))?;
     ctx.set_parameter(CParameter::ContentSizeFlag(false))?;
     ctx.set_parameter(CParameter::DictIdFlag(false))?;
-    ctx.set_parameter(CParameter::Format(FrameFormat::Magicless))?;
 
     Ok(ctx)
 }
@@ -65,12 +64,12 @@ mod private {
                     let ctx = optional_ctx.get_or_insert_with(|| create_default_compression_context().expect("Could not create compression context."));
                     ctx.reset(ResetDirective::SessionOnly).expect("Could not reset compression context.");
                     ctx.set_parameter(CParameter::CompressionLevel(LEVEL as i32)).map_err(|_| DbError::Serialize(format!("Could not set compression level on context.").into()))?;
-                    self.0.write(zstd::stream::Encoder::with_context(writer, ctx))
+                    self.0.write(zstd::stream::Encoder::with_context(writer, ctx).auto_finish())
                 }
                 else {
                     let mut ctx = create_default_compression_context().expect("Could not create compression context.");
                     ctx.set_parameter(CParameter::CompressionLevel(LEVEL as i32)).map_err(|_| DbError::Serialize(format!("Could not set compression level on context.").into()))?;
-                    self.0.write(zstd::stream::Encoder::with_context(writer, &mut ctx))
+                    self.0.write(zstd::stream::Encoder::with_context(writer, &mut ctx).auto_finish())
                 }
             })
         }

@@ -27,6 +27,14 @@ impl<'a, T: Serialize + DeserializeOwned, I: 'a + std::io::Read> DataTransform<'
     }
 }
 
+impl<'a, T: Serialize + DeserializeOwned> DataTransform<'a, AccessGuard<'a, &'static [u8]>, FromArchive> for Rmp<T> {
+    type Output = T;
+
+    fn apply(input: AccessGuard<'a, &'static [u8]>) -> Result<Self::Output, DbError> {
+        from_slice(input.as_ref()).map_err(DbError::from_deserialize)
+    }
+}
+
 mod private {
     use super::*;
 
