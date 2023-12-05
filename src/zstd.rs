@@ -72,12 +72,12 @@ mod private {
                 if let Ok(mut optional_ctx) = ref_ctx.try_borrow_mut() {
                     let ctx = optional_ctx.get_or_insert_with(|| create_default_compression_context().expect("Could not create compression context."));
                     ctx.reset(ResetDirective::SessionOnly).expect("Could not reset compression context.");
-                    ctx.set_parameter(CParameter::CompressionLevel(LEVEL as i32)).map_err(|_| ArchiveError::Serialize(format!("Could not set compression level on context.").into()))?;
+                    ctx.set_parameter(CParameter::CompressionLevel(LEVEL as i32)).map_err(|_| ArchiveError::Serialize("Could not set compression level on context.".to_string().into()))?;
                     self.0.write(zstd::stream::Encoder::with_context(writer, ctx).auto_finish())
                 }
                 else {
                     let mut ctx = create_default_compression_context().expect("Could not create compression context.");
-                    ctx.set_parameter(CParameter::CompressionLevel(LEVEL as i32)).map_err(|_| ArchiveError::Serialize(format!("Could not set compression level on context.").into()))?;
+                    ctx.set_parameter(CParameter::CompressionLevel(LEVEL as i32)).map_err(|_| ArchiveError::Serialize("Could not set compression level on context.".to_string().into()))?;
                     self.0.write(zstd::stream::Encoder::with_context(writer, &mut ctx).auto_finish())
                 }
             })

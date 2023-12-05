@@ -1,5 +1,5 @@
+#![allow(clippy::type_complexity)]
 #![allow(incomplete_features)]
-#![feature(associated_type_bounds)]
 #![feature(generic_const_exprs)]
 
 use crate::private::*;
@@ -88,7 +88,7 @@ impl<'a, M: Mutability, D> Transaction<'a, M, D> {
 
             err.map(Err).into_iter().chain(ok.and_then(std::convert::identity)
                 .into_iter()
-                .flat_map(std::convert::identity)
+                .flatten()
                 .map(|x| x.map_err(ArchiveError::from_io)
                     .and_then(|(k, _)| Ok(transmute(<<<D as ArchiveType<K>>::Key as BinaryConverter<'static>>::ValueConverter>::apply(transmute(k))?)))))
         }
@@ -104,7 +104,7 @@ impl<'a, M: Mutability, D> Transaction<'a, M, D> {
 
             err.map(Err).into_iter().chain(ok.and_then(std::convert::identity)
                 .into_iter()
-                .flat_map(std::convert::identity)
+                .flatten()
                 .map(|x| x.map_err(ArchiveError::from_io)
                     .and_then(|(_, v)| Ok(transmute(<<<D as ArchiveType<K>>::Value as DataLoad<'static>>::OutputConverter>::apply(transmute(v))?)))))
         }
@@ -120,7 +120,7 @@ impl<'a, M: Mutability, D> Transaction<'a, M, D> {
 
             err.map(Err).into_iter().chain(ok.and_then(std::convert::identity)
                 .into_iter()
-                .flat_map(std::convert::identity)
+                .flatten()
                 .map(|x| x.map_err(ArchiveError::from_io)
                     .and_then(|(k, v)| Ok((
                         transmute(<<<D as ArchiveType<K>>::Key as BinaryConverter<'static>>::ValueConverter>::apply(transmute(k))?),
