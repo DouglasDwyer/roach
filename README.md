@@ -1,7 +1,6 @@
 # roach
 
-[![Crates.io](https://img.shields.io/crates/v/roach.svg)](https://crates.io/crates/roach)
-[![Docs.rs](https://docs.rs/roach/badge.svg)](https://docs.rs/roach)
+[![Docs.rs](https://img.shields.io/badge/docs-passing-gre)](https://docs.rs/roach)
 ![Nightly](https://img.shields.io/badge/nightly-required-red)
 
 #### Rust object archive: strongly-typed persistent key value storage

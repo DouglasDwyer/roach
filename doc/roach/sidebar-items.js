@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ArchiveError"],"mod":["backend"],"struct":["AccessGuard","Archive","Const","FromArchive","Mut","Pod","PodGuard","Rmp","StringGuard","ToArchive","Transaction","Zstd"],"trait":["ArchiveType","DataConverter","DataTransform","Direction","Mutability","StorageBackend","ToWriter"]};

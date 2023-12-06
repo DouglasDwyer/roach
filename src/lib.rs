@@ -60,6 +60,7 @@
 
 use crate::private::*;
 use redb::*;
+/// Provides backends to store archive data in various ways.
 pub use redb::backends as backend;
 pub use redb::StorageBackend;
 use semver::*;
