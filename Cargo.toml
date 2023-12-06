@@ -2,6 +2,12 @@
 name = "roach"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/DouglasDwyer/roach"
+readme = "README.md"
+description = """
+Rust object archive: strongly-typed persistent key value storage.
+"""
 
 [dependencies]
 bytemuck = { version = "1.14.0", default-features = false, features = [ "extern_crate_std" ], optional = true }
@@ -17,3 +23,6 @@ zstd-safe = { git = "https://github.com/DouglasDwyer/zstd-rs", rev = "4a5e9a15b0
 [features]
 rmp-serde = [ "dep:rmp-serde", "dep:serde" ]
 zstd = [ "dep:zstd", "dep:zstd-safe" ]
+
+[package.metadata.docs.rs]
+all-features = true
