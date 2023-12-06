@@ -2,6 +2,7 @@ use crate::rmp_serde::private::*;
 use crate::*;
 use ::rmp_serde::encode::*;
 use ::rmp_serde::*;
+use serde::*;
 use serde::de::*;
 
 /// Archives a type by serializing its contents with the MessagePack protocol.

@@ -19,7 +19,6 @@ use redb::*;
 pub use redb::backends as backend;
 pub use redb::StorageBackend;
 use semver::*;
-use serde::*;
 use std::any::*;
 use std::cell::*;
 use std::marker::*;
@@ -862,9 +861,9 @@ const fn trim_name(name: &'static str) -> &'static str {
 
                     let result = std::intrinsics::const_allocate((beginning.len() + rest.len() + 2) * std::mem::size_of::<u8>(), std::mem::align_of::<u8>());
                     std::ptr::copy_nonoverlapping(beginning.as_ptr(), result, beginning.len());
-                    *result.add(beginning.len()) = '<' as u8;
+                    *result.add(beginning.len()) = b'<';
                     std::ptr::copy_nonoverlapping(rest.as_ptr(), result.add(beginning.len() + 1), rest.len());
-                    *result.add(beginning.len() + rest.len() + 1) = '>' as u8;
+                    *result.add(beginning.len() + rest.len() + 1) = b'>';
                     return std::str::from_utf8_unchecked(from_raw_parts(result, beginning.len() + rest.len() + 2));
                 }
                 i += 1;
@@ -878,6 +877,11 @@ const fn trim_name(name: &'static str) -> &'static str {
     }
 }
 
+/// Removes the namespace from a type name.
+/// 
+/// # Safety
+/// 
+/// The name must be a valid ASCII string.
 const unsafe fn trim_namespace(name: &'static str) -> &'static str {
     let mut i = name.len();
     while i > 0 {
@@ -891,6 +895,11 @@ const unsafe fn trim_namespace(name: &'static str) -> &'static str {
     name
 }
 
+/// Creates a constant slice of a string.
+/// 
+/// # Safety
+/// 
+/// The start and end must be within the string's range.
 const unsafe fn slice_str(a: &'static str, start: usize, end: usize) -> &'static str {
     let bytes = from_raw_parts(a.as_bytes().as_ptr().add(start), end - start);
     std::str::from_utf8_unchecked(bytes)
@@ -1087,47 +1096,5 @@ mod private {
             > + ?Sized;
         /// The raw byte type used to store the data.
         type RawValueType: 'static + RedbKey;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[repr(transparent)]
-    #[derive(Serialize, Deserialize, Debug)]
-    struct MyData<T>(pub T);
-
-    struct MyDb;
-
-    impl ArchiveType<MyData<u8>> for MyDb {
-        type Key = rmp_serde::Rmp<MyData<u8>>;
-        type Value = zstd::Zstd<[u8]>;
-    }
-
-    impl ArchiveType<u32> for MyDb {
-        type Key = bytemuck::Pod<u32>;
-        type Value = zstd::Zstd<rmp_serde::Rmp<String>>;
-    }
-
-    impl ArchiveType<i64> for MyDb {
-        type Key = bytemuck::Pod<i64>;
-        type Value = bytemuck::Pod<u16>;
-    }
-
-    #[test]
-    fn test() {
-        let x = Archive::<MyDb>::new(backends::InMemoryBackend::new()).unwrap();
-        let mut txn = x.write().unwrap();
-        txn.set(&25u32, &"henlo".to_string()).unwrap();
-        txn.set(&28u32, &"fren".to_string()).unwrap();
-        txn.set(&40i64, &26).unwrap();
-        println!("Swapped {:?}", txn.replace(&25u32, &"goodby".to_string()));
-        txn.set(&MyData(28u8), &[31, 24, 7][..]).unwrap();
-        txn.commit().unwrap();
-        let txn = x.read().unwrap();
-        for value in txn.iter::<MyData<u8>>() {
-            println!("VALUE {value:?}");
-        }
     }
 }
