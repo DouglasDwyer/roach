@@ -1,6 +1,6 @@
 # roach
 
-[![Docs.rs](https://img.shields.io/badge/docs-passing-gre)](https://docs.rs/roach)
+[![Docs.rs](https://img.shields.io/badge/docs-passing-gre)](https://douglasdwyer.github.io/roach/roach/)
 ![Nightly](https://img.shields.io/badge/nightly-required-red)
 
 #### Rust object archive: strongly-typed persistent key value storage
