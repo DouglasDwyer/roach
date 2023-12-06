@@ -3,6 +3,7 @@ use crate::*;
 use ::zstd::*;
 use zstd_safe::*;
 
+/// Archives a byte array by serializing it using the `zstd` algorithm.
 pub struct Zstd<T: ?Sized, const LEVEL: u32 = 0>(PhantomData<T>);
 
 impl<T: DataConverter + ?Sized, const LEVEL: u32> DataConverter for Zstd<T, LEVEL>
@@ -44,6 +45,7 @@ impl<'a, const LEVEL: u32> DataTransform<'a, AccessGuard<'a, &'static [u8]>, Fro
     type Output = Vec<u8>;
 
     fn apply(input: AccessGuard<'a, &'static [u8]>) -> Result<Self::Output, ArchiveError> {
+        /// The initial size to allocate when converting the result into a vector.
         const DEFAULT_SIZE: usize = usize::BITS as usize;
         let mut res = Vec::with_capacity(DEFAULT_SIZE);
         std::io::Read::read_to_end(
@@ -89,9 +91,11 @@ fn create_default_compression_context() -> Result<CCtx<'static>, ErrorCode> {
     Ok(ctx)
 }
 
+/// Hides implementation details.
 mod private {
     use super::*;
 
+    /// Writes the contents of the byte data, serializing it at the same time.
     pub struct ZstdWrite<T: ToWriter, const LEVEL: u32>(pub T);
 
     impl<T: ToWriter, const LEVEL: u32> ToWriter for ZstdWrite<T, LEVEL> {
@@ -141,6 +145,7 @@ mod private {
         type RefType = &'static [u8];
 
         fn into_db_value(self) -> Result<Self::ByteType, ArchiveError> {
+            /// The initial size to allocate when converting the result into a vector.
             const DEFAULT_SIZE: usize = usize::BITS as usize;
             let mut result = Vec::with_capacity(DEFAULT_SIZE);
             self.write(&mut result)?;

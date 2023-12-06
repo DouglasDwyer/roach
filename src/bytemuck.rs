@@ -1,7 +1,7 @@
 use crate::*;
 use ::bytemuck::*;
-use std::ops::*;
 
+/// Archives a type by copying its raw bytes. Endianness is conserved when the value is stored.
 pub struct Pod<T: ::bytemuck::Pod + Zeroable>(PhantomData<T>);
 
 impl<T: ::bytemuck::Pod + Zeroable> DataConverter for Pod<T>
@@ -34,6 +34,7 @@ where
     }
 }
 
+/// Provides a view of `Pod`-archived data in an archive.
 pub struct PodGuard<T: ::bytemuck::Pod + Zeroable, I: AsRef<[u8; size_of::<T>()]>>(
     I,
     PhantomData<T>,

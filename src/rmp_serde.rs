@@ -4,6 +4,7 @@ use ::rmp_serde::encode::*;
 use ::rmp_serde::*;
 use serde::de::*;
 
+/// Archives a type by serializing its contents with the MessagePack protocol.
 pub struct Rmp<T: 'static + Serialize + DeserializeOwned>(PhantomData<T>);
 
 impl<T: Serialize + DeserializeOwned> DataConverter for Rmp<T> {
@@ -38,9 +39,11 @@ impl<'a, T: Serialize + DeserializeOwned>
     }
 }
 
+/// Hides implementation details.
 mod private {
     use super::*;
 
+    /// Writes the serialized value of an object to a writer.
     pub struct SerializeWrite<'a, T: Serialize + DeserializeOwned>(pub &'a T);
 
     impl<'a, T: Serialize + DeserializeOwned> ToWriter for SerializeWrite<'a, T> {
@@ -54,6 +57,7 @@ mod private {
         type RefType = &'static [u8];
 
         fn into_db_value(self) -> Result<Self::ByteType, ArchiveError> {
+            /// The initial size to allocate when converting the result into a vector.
             const DEFAULT_SIZE: usize = usize::BITS as usize;
             let mut result = Vec::with_capacity(DEFAULT_SIZE);
             self.write(&mut result)?;
