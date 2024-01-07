@@ -1,6 +1,6 @@
 [package]
 name = "roach"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/DouglasDwyer/roach"
@@ -11,6 +11,7 @@ Rust object archive: strongly-typed persistent key value storage.
 
 [dependencies]
 bytemuck = { version = "1.14.0", default-features = false, features = [ "extern_crate_std" ], optional = true }
+mutability_marker = { version = "0.1.0", default-features = false }
 redb = { version = "1.4.0", default-features = false }
 rmp-serde = { version = "1.1.2", default-features = false, optional = true }
 semver = { version = "1.0.20", default-features = false, features = [ "std" ] }

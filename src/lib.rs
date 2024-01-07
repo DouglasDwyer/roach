@@ -8,6 +8,7 @@
 #![feature(core_intrinsics)]
 #![feature(generic_const_exprs)]
 
+#![allow(internal_features)]
 #![deny(warnings)]
 #![warn(missing_docs)]
 #![warn(clippy::missing_docs_in_private_items)]
@@ -59,6 +60,7 @@
 //! **zstd** - Enables the `Zstd` data transform, which compresses data before it is stored.
 
 use crate::private::*;
+pub use mutability_marker::{Const, Mut};
 use redb::*;
 /// Provides backends to store archive data in various ways.
 pub use redb::backends as backend;
@@ -152,7 +154,7 @@ impl<D> std::fmt::Debug for Archive<D> {
 }
 
 /// Facilitates an atomic interaction with an `Archive`.
-pub struct Transaction<'a, M: Mutability, D> {
+pub struct Transaction<'a, M: TransactionMutability, D> {
     /// A linked-list of open tables, which all have pointers to the transaction.
     tables: UnsafeCell<Option<RawTableNode<M>>>,
     /// A lock used when adding nodes to the table list.
@@ -163,7 +165,7 @@ pub struct Transaction<'a, M: Mutability, D> {
     marker: PhantomData<D>,
 }
 
-impl<'a, M: Mutability, D> Transaction<'a, M, D> {
+impl<'a, M: TransactionMutability, D> Transaction<'a, M, D> {
     /// Creates a new transaction with no open tables.
     fn new(txn: M::TransactionType<'a>) -> Self {
         Self {
@@ -600,16 +602,16 @@ impl<'a, D> Transaction<'a, Mut, D> {
     }
 }
 
-unsafe impl<'a, M: Mutability, D> Send for Transaction<'a, M, D> {}
-unsafe impl<'a, M: Mutability, D> Sync for Transaction<'a, M, D> {}
+unsafe impl<'a, M: TransactionMutability, D> Send for Transaction<'a, M, D> {}
+unsafe impl<'a, M: TransactionMutability, D> Sync for Transaction<'a, M, D> {}
 
-impl<'a, M: Mutability, D> std::fmt::Debug for Transaction<'a, M, D> {
+impl<'a, M: TransactionMutability, D> std::fmt::Debug for Transaction<'a, M, D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Transaction").finish()
     }
 }
 
-impl<'a, M: Mutability, D> Drop for Transaction<'a, M, D> {
+impl<'a, M: TransactionMutability, D> Drop for Transaction<'a, M, D> {
     fn drop(&mut self) {
         unsafe {
             if self.txn.is_some() {
@@ -776,12 +778,6 @@ impl<'a> AsRef<[u8]> for AccessGuard<'a, &[u8]> {
     }
 }
 
-/// Marks an immutable type.
-pub struct Const;
-
-/// Marks a mutable type.
-pub struct Mut;
-
 /// Marks a type that converts objects to their archived representation.
 pub struct ToArchive;
 
@@ -820,14 +816,14 @@ impl ArchiveError {
 }
 
 /// Holds a table over the course of the transaction.
-struct RawTable<M: Mutability> {
+struct RawTable<M: TransactionMutability> {
     /// The type-erased table.
     table: M::TableType<'static, 'static, (), ()>,
     /// The function that should be used to drop the table.
     dropper: unsafe fn(*mut ()),
 }
 
-impl<M: Mutability> RawTable<M> {
+impl<M: TransactionMutability> RawTable<M> {
     /// Creates a new raw table.
     /// 
     /// # Safety
@@ -883,7 +879,7 @@ impl<M: Mutability> RawTable<M> {
 }
 
 /// A node in the linked-list of tables for a transaction.
-struct RawTableNode<M: Mutability> {
+struct RawTableNode<M: TransactionMutability> {
     /// The ID of the key type for the table.
     pub id: TypeId,
     /// The table itself.
@@ -960,10 +956,10 @@ impl Sealed for FromArchive {}
 impl Sealed for ToArchive {}
 
 /// Marks whether a type is mutable or immutable.
-pub trait Mutability: MutabilityInner {}
+pub trait TransactionMutability: TransactionMutabilityInner {}
 
-impl Mutability for Const {}
-impl Mutability for Mut {}
+impl TransactionMutability for Const {}
+impl TransactionMutability for Mut {}
 
 /// Hides implementation details.
 mod private {
@@ -973,7 +969,7 @@ mod private {
     pub trait Sealed {}
 
     /// Defines types associated with constant or mutable transactions.
-    pub trait MutabilityInner {
+    pub trait TransactionMutabilityInner {
         /// The type of a table associated with this transaction.
         type TableType<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue>: ReadableTable<
             K,
@@ -989,7 +985,7 @@ mod private {
         ) -> Result<Option<Self::TableType<'a, 'b, K, V>>, ArchiveError>;
     }
 
-    impl MutabilityInner for Const {
+    impl TransactionMutabilityInner for Const {
         type TableType<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue> =
             ReadOnlyTable<'a, K, V>;
         type TransactionType<'a> = ReadTransaction<'a>;
@@ -1006,7 +1002,7 @@ mod private {
         }
     }
 
-    impl MutabilityInner for Mut {
+    impl TransactionMutabilityInner for Mut {
         type TableType<'a: 'b, 'b, K: 'static + RedbKey, V: 'static + RedbValue> =
             Table<'a, 'b, K, V>;
         type TransactionType<'a> = WriteTransaction<'a>;
