@@ -1065,6 +1065,15 @@ mod private {
         }
     }
 
+    impl IntoBytes for String {
+        type ByteType = Self;
+        type RefType = &'static [u8];
+
+        fn into_db_value(self) -> Result<Self::ByteType, ArchiveError> {
+            Ok(self)
+        }
+    }
+
     /// Marks a type which may be referenced as a byte array.
     pub trait AsByteRef<T: RedbKey> {
         /// Gets a reference to the raw database type associated with this byte array.
@@ -1092,6 +1101,12 @@ mod private {
     impl AsByteRef<&'static [u8]> for Vec<u8> {
         fn as_ref(&self) -> &[u8] {
             &self[..]
+        }
+    }
+
+    impl AsByteRef<&'static [u8]> for String {
+        fn as_ref(&self) -> &[u8] {
+            self.as_bytes()
         }
     }
 
