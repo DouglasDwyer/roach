@@ -5,6 +5,7 @@
 #![feature(const_mut_refs)]
 #![feature(const_option)]
 #![feature(const_type_name)]
+#![feature(const_intrinsic_copy)]
 #![feature(core_intrinsics)]
 #![feature(generic_const_exprs)]
 
