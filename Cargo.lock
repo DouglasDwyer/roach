@@ -156,7 +156,7 @@ dependencies = [
 
 [[package]]
 name = "roach"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "bytemuck",
  "mutability_marker",
@@ -308,24 +308,24 @@ dependencies = [
 
 [[package]]
 name = "zstd"
-version = "0.12.4"
-source = "git+https://github.com/DouglasDwyer/zstd-rs?rev=4a5e9a15b00aeecb3866fd3d420d8ae91f12b151#4a5e9a15b00aeecb3866fd3d420d8ae91f12b151"
+version = "0.13.1"
+source = "git+https://github.com/DouglasDwyer/zstd-rs?rev=e128e31fab656186e03feb269d0bf889635dfa0f#e128e31fab656186e03feb269d0bf889635dfa0f"
 dependencies = [
  "zstd-safe",
 ]
 
 [[package]]
 name = "zstd-safe"
-version = "6.0.6"
-source = "git+https://github.com/DouglasDwyer/zstd-rs?rev=4a5e9a15b00aeecb3866fd3d420d8ae91f12b151#4a5e9a15b00aeecb3866fd3d420d8ae91f12b151"
+version = "7.1.0"
+source = "git+https://github.com/DouglasDwyer/zstd-rs?rev=e128e31fab656186e03feb269d0bf889635dfa0f#e128e31fab656186e03feb269d0bf889635dfa0f"
 dependencies = [
  "zstd-sys",
 ]
 
 [[package]]
 name = "zstd-sys"
-version = "2.0.8+zstd.1.5.5"
-source = "git+https://github.com/DouglasDwyer/zstd-rs?rev=4a5e9a15b00aeecb3866fd3d420d8ae91f12b151#4a5e9a15b00aeecb3866fd3d420d8ae91f12b151"
+version = "2.0.10+zstd.1.5.6"
+source = "git+https://github.com/DouglasDwyer/zstd-rs?rev=e128e31fab656186e03feb269d0bf889635dfa0f#e128e31fab656186e03feb269d0bf889635dfa0f"
 dependencies = [
  "cc",
  "pkg-config",
